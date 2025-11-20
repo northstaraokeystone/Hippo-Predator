@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>HIPPO PREDATOR</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Rajdhani:wght@700&display=swap');
+    
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body, html { height: 100%; overflow: hidden; background: #000; }
+    
+    .stars { position: absolute; inset: 0; background: transparent url('https://assets.codepen.io/1538474/starfield.png') repeat; animation: stars 300s linear infinite; opacity: 0.3; }
+    @keyframes stars { from {background-position:0 0;} to {background-position: 10000px 0;} }
+
+    .blood-overlay { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at center, rgba(139,0,0,var(--blood,0)), transparent 60%); transition: all 1.5s ease; opacity: 0.9; }
+
+    #landing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at center, #330000, #000); }
+
+    .hippo-orbit { position: relative; width: 420px; height: 420px; margin-bottom: 60px; }
+    .hippo-symbol { position: absolute; top: 50%; left: 50%; font-size: 180px; transform: translate(-50%, -50%); filter: drop-shadow(0 0 60px #ff0000); animation: pulse 2.5s infinite ease-in-out, orbit 16s linear infinite; }
+    .angry1 { color: #ff0000; animation-delay: 0s, 0s; }
+    .angry2 { color: #ff0048; animation-delay: 0.8s, -5.33s; }
+    .angry3 { color: #ff0066; animation-delay: 1.6s, -10.66s; }
+
+    @keyframes pulse { 0%,100% { transform: translate(-50%,-50%) scale(1); } 50% { transform: translate(-50%,-50%) scale(1.5); } }
+    @keyframes orbit { from { transform: translate(-50%,-50%) rotate(0deg) translateY(-180px) rotate(0deg); } to { transform: translate(-50%,-50%) rotate(360deg) translateY(-180px) rotate(-360deg); } }
+
+    h1 { 
+        font-family: 'Orbitron', sans-serif; 
+        font-size: 100px; 
+        letter-spacing: 15px; 
+        background: linear-gradient(90deg, #ff0000, #ff0066, #ff0033); 
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent; 
+        color: transparent; 
+        animation: titleGlow 3s infinite alternate; 
+        text-shadow: 0 0 80px #ff0000; 
+    }
+    @keyframes titleGlow { from { filter: hue-rotate(0deg) brightness(1); } to { filter: hue-rotate(360deg) brightness(1.8); } }
+
+    .subtitle { font-size: 32px; margin: 30px 0 60px; letter-spacing: 8px; color: #ff3366; animation: flicker 4s infinite; }
+    @keyframes flicker { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .feed-button { font-size: 48px; padding: 40px 100px; background: linear-gradient(45deg, #880000, #ff0033); border: none; color: white; border-radius: 60px; box-shadow: 0 0 80px #ff0000; animation: buttonPulse 1.5s infinite; cursor: pointer; font-weight: 900; letter-spacing: 10px; }
+    @keyframes buttonPulse { 0%,100% { box-shadow: 0 0 80px #ff0000; } 50% { box-shadow: 0 0 140px #ff0000; } }
+
+    #game { position: absolute; inset: 0; display: none; }
+    canvas { display: block; }
+
+    .score-display { position: absolute; top: 50px; left: 50%; transform: translateX(-50%); font-size: 90px; font-weight: 900; color: #ff0033; text-shadow: 0 0 30px #ff0000; z-index: 10; }
+
+    .get-ready { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; letter-spacing: 8px; color: #ff3366; z-index: 20; pointer-events: none; }
+
+    .mode-toggle { position: absolute; top: 50px; right: 30px; font-size: 30px; color: #ff3366; cursor: pointer; z-index: 100; text-shadow: 0 0 20px #ff0000; user-select: none; }
+
+    .taunt { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 80px; letter-spacing: 12px; opacity: 0; text-align: center; pointer-events: none; z-index: 20; color: #ff0000; text-shadow: 0 0 40px #000; }
+
+    .cassette { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); font-size: 22px; opacity: 0.85; letter-spacing: 5px; animation: cassette 8s linear infinite; color: #ff3366; }
+    @keyframes cassette { 0% { transform: translateX(-50%) translateX(0); } 50% { transform: translateX(-50%) translateX(30px); } 100% { transform: translateX(-50%) translateX(0); } }
+</style>
+</head>
+<body>
+
+<div class="stars"></div>
+<div class="blood-overlay"></div>
+
+<div id="landing">
+    <div class="hippo-orbit">
+        <div class="hippo-symbol angry1">🦛</div>
+        <div class="hippo-symbol angry2">🦛</div>
+        <div class="hippo-symbol angry3">🦛</div>
+    </div>
+    <h1>HIPPO PREDATOR</h1>
+    <div class="subtitle">THE HIPPO REFUSES TO ACCEPT GRAVITY</div>
+    <button class="feed-button" onclick="startGame()">UNLEASH</button>
+</div>
+
+<div id="game">
+    <div class="score-display" id="score">0</div>
+    <div class="mode-toggle" id="mode-toggle">NORMAL MODE</div>
+    <div class="get-ready" id="get-ready">TAP OR SPACE TO FLY</div>
+    <div class="taunt" id="taunt"></div>
+    <canvas id="canvas"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const saved = localStorage.getItem('hippoPredator');
+const data = saved ? JSON.parse(saved) : {highScore: 0, sessionDeaths: 0};
+let highScore = data.highScore;
+let sessionDeaths = data.sessionDeaths || 0;
+
+let hippo = {x: canvas.width/4, y: canvas.height/2, vy: 0, size: 100, gravity: 0.3, jump: -10, rotation: 0, rage: false};
+let pipes = [];
+let particles = [];
+let score = 0;
+let frame = 0;
+let gameOver = false;
+let started = false;
+let waitingForFirstFlap = true;
+let shakeAmount = 0;
+
+let mode = 'normal';
+
+let gap = 450;
+let speed = 1.5;
+let spawnInterval = 280;
+
+const modeToggle = document.getElementById('mode-toggle');
+const getReady = document.getElementById('get-ready');
+
+modeToggle.addEventListener('click', () => {
+    mode = mode === 'normal' ? 'enraged' : 'normal';
+    modeToggle.textContent = mode === 'enraged' ? 'ENRAGED MODE' : 'NORMAL MODE';
+    modeToggle.style.color = mode === 'enraged' ? '#ff0000' : '#ff3366';
+
+    hippo.gravity = mode === 'normal' ? 0.3 : 0.8;
+    hippo.jump = mode === 'normal' ? -10 : -16;
+});
+
+function spawnPipe() {
+    const minHeight = 80;
+    const maxHeight = canvas.height - gap - minHeight;
+    const h = minHeight + Math.random() * (maxHeight - minHeight);
+    pipes.push({x: canvas.width + 100, top: h, gap: gap, passed: false});
+
+    if (score > 30 && Math.random() < 0.3) {
+        const h2 = minHeight + Math.random() * (maxHeight - minHeight);
+        pipes.push({x: canvas.width + 450, top: h2, gap: gap, passed: false});
+    }
+}
+
+function drawBackground() {
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#330011');
+    gradient.addColorStop(0.5, '#551100');
+    gradient.addColorStop(1, '#000011');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = '#003300';
+    ctx.lineWidth = 20;
+    for (let i = 0; i < 8; i++) {
+        const x = (frame * 0.5 + i*200) % (canvas.width + 400) - 200;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.quadraticCurveTo(x + 100, canvas.height/2, x - 50, canvas.height);
+        ctx.stroke();
+    }
+}
+
+function drawHippo() {
+    ctx.save();
+    const shakeX = shakeAmount > 0 ? Math.random() * shakeAmount - shakeAmount/2 : 0;
+    const shakeY = shakeAmount > 0 ? Math.random() * shakeAmount - shakeAmount/2 : 0;
+    ctx.translate(hippo.x + shakeX, hippo.y + shakeY);
+    ctx.rotate(hippo.rotation);
+    ctx.font = hippo.size + 'px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = mode === 'enraged' ? '#ff0000' : '#ff6699';
+    ctx.fillText('🦛', 0, 0);
+    if (hippo.rage) {
+        ctx.fillStyle = '#ff0000';
+        ctx.font = '50px Arial';
+        ctx.fillText('👹', -25, -25);
+        ctx.fillText('👹', 25, -25);
+        ctx.fillStyle = '#ffffff88';
+        ctx.fillText('💨', -60, -40);
+        ctx.fillText('💨', 60, -40);
+    }
+    ctx.restore();
+}
+
+function drawPipes() {
+    pipes.forEach(pipe => {
+        const jawOpen = Math.sin(frame / 7 + pipe.x / 50) * 35;
+
+        // TOP CROC JAW
+        ctx.fillStyle = '#006600';
+        ctx.fillRect(pipe.x - 50, 0, 220, pipe.top + 50);
+        ctx.fillRect(pipe.x - 50, pipe.top - 100 + jawOpen, 220, 120);
+        ctx.fillStyle = '#00ff00';
+        for (let t = 0; t < 7; t++) {
+            const tx = pipe.x + t*30 - 50;
+            ctx.fillRect(tx, pipe.top - 20 + jawOpen, 25, 60);
+        }
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(pipe.x + 60, pipe.top - 50 + jawOpen, 20, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#ff0000';
+        ctx.beginPath(); ctx.arc(pipe.x + 68, pipe.top - 50 + jawOpen, 10, 0, Math.PI*2); ctx.fill();
+
+        // BOTTOM CROC JAW
+        const bottomY = pipe.top + pipe.gap;
+        ctx.fillStyle = '#006600';
+        ctx.fillRect(pipe.x - 50, bottomY - 50, 220, canvas.height - (bottomY - 50));
+        ctx.fillRect(pipe.x - 50, bottomY - 20 - jawOpen, 220, 120);
+        ctx.fillStyle = '#00ff00';
+        for (let t = 0; t < 7; t++) {
+            const tx = pipe.x + t*30 - 50;
+            ctx.fillRect(tx, bottomY - 80 - jawOpen, 25, 60);
+        }
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(pipe.x + 60, bottomY + 70 - jawOpen, 20, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#ff0000';
+        ctx.beginPath(); ctx.arc(pipe.x + 68, bottomY + 70 - jawOpen, 10, 0, Math.PI*2); ctx.fill();
+    });
+}
+
+function drawParticles() {
+    particles.forEach((p,i) => {
+        ctx.fillStyle = `rgba(139,0,0,${p.alpha})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.6;
+        p.alpha -= 0.015;
+        if (p.alpha <= 0) particles.splice(i,1);
+    });
+}
+
+function update() {
+    if (gameOver) return;
+
+    if (waitingForFirstFlap) {
+        hippo.y = canvas.height/2 + Math.sin(frame / 20) * 30;
+        hippo.rotation = 0;
+        getReady.style.opacity = 0.6 + Math.sin(frame / 8) * 0.3;
+        drawBackground();
+        drawHippo();
+        return;
+    }
+
+    hippo.vy += hippo.gravity;
+    hippo.y += hippo.vy;
+
+    hippo.rotation = Math.min(Math.max(hippo.vy * 0.09, -0.6), 1.4);
+
+    if (hippo.y < -100 || hippo.y + 80 > canvas.height) die();
+
+    frame++;
+    if (frame % spawnInterval === 0) {
+        spawnPipe();
+    }
+
+    pipes.forEach(pipe => {
+        pipe.x -= speed;
+
+        if (pipe.x + 120 < hippo.x && !pipe.passed) {
+            pipe.passed = true;
+            score++;
+            document.getElementById('score').textContent = score;
+            if (score > 15) hippo.rage = true;
+            if (score % 5 === 0) {
+                gap = Math.max(gap - 6, mode === 'normal' ? 130 : 70);
+                speed += 0.3;
+                spawnInterval = Math.max(spawnInterval - 5, 80);
+            }
+        }
+
+        if (hippo.x + 60 > pipe.x && hippo.x - 60 < pipe.x + 120) {
+            if (hippo.y - 60 < pipe.top || hippo.y + 60 > pipe.top + pipe.gap) {
+                die();
+            }
+        }
+    });
+
+    pipes = pipes.filter(p => p.x > -300);
+
+    drawBackground();
+    drawPipes();
+    drawParticles();
+    drawHippo();
+}
+
+function die() {
+    gameOver = true;
+    sessionDeaths++;
+    localStorage.setItem('hippoPredator', JSON.stringify({highScore: Math.max(score, highScore), sessionDeaths}));
+
+    shakeAmount = 30;
+
+    for (let i = 0; i < 200; i++) {
+        particles.push({
+            x: hippo.x, y: hippo.y,
+            vx: Math.random()*40-20, vy: Math.random()*30-20,
+            size: Math.random()*15+8, alpha: 1
+        });
+    }
+
+    const taunts = ["CROC FOOD","TERRITORIAL VIOLATION","THE RIVER REMEMBERS","YAWNING DEATH","YOU ARE BENEATH ME","HIPPO ANGRY","DROWN IN FAILURE","NEXT","WEAK MEAT","RAAAAWR"];
+    const tauntEl = document.getElementById('taunt');
+    tauntEl.textContent = taunts[Math.floor(Math.random()*taunts.length)];
+    tauntEl.style.opacity = 1;
+
+    document.querySelector('.blood-overlay').style.setProperty('--blood', Math.min(sessionDeaths * 0.2, 0.9));
+
+    setTimeout(() => {
+        if (confirm(`SCORE: ${score} | RIVER GOD'S BEST: ${highScore}\n\nTHE HIPPO DEMANDS ANOTHER SACRIFICE\nPlay again?`)) reset();
+    }, 3000);
+}
+
+function reset() {
+    mode = highScore > 15 ? 'enraged' : 'normal';
+    modeToggle.textContent = mode === 'enraged' ? 'ENRAGED MODE' : 'NORMAL MODE';
+    modeToggle.style.color = mode === 'enraged' ? '#ff0000' : '#ff3366';
+
+    hippo.gravity = mode === 'normal' ? 0.3 : 0.8;
+    hippo.jump = mode === 'normal' ? -10 : -16;
+
+    hippo.x = canvas.width/4;
+    hippo.y = canvas.height/2;
+    hippo.vy = 0;
+    hippo.rotation = 0;
+    hippo.rage = false;
+    pipes = [];
+    particles = [];
+    score = 0;
+    frame = 0;
+    gameOver = false;
+    started = true;
+    waitingForFirstFlap = true;
+    shakeAmount = 0;
+    gap = 450;
+    speed = 1.5;
+    spawnInterval = 280;
+    document.getElementById('score').textContent = '0';
+    document.getElementById('taunt').style.opacity = 0;
+    getReady.style.opacity = 1;
+    getReady.style.display = 'block';
+    loop();
+}
+
+function startGame() {
+    document.getElementById('landing').style.display = 'none';
+    document.getElementById('game').style.display = 'block';
+    reset();
+}
+
+function flap() {
+    if (gameOver) return;
+
+    if (waitingForFirstFlap) {
+        waitingForFirstFlap = false;
+        getReady.style.display = 'none';
+    }
+
+    hippo.vy = hippo.jump;
+}
+
+function loop() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    if (shakeAmount > 0) {
+        const dx = Math.random() * shakeAmount - shakeAmount/2;
+        const dy = Math.random() * shakeAmount - shakeAmount/2;
+        ctx.translate(dx, dy);
+        shakeAmount -= 1.5;
+    }
+
+    update();
+
+    if (shakeAmount > 0) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+
+    requestAnimationFrame(loop);
+}
+
+canvas.addEventListener('click', flap);
+canvas.addEventListener('touchstart', flap);
+window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); flap(); }});
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    hippo.x = canvas.width/4;
+});
+
+loop();
+</script>
+</body>
+</html>
